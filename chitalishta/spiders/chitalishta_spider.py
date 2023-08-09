@@ -18,8 +18,10 @@ class ChitalishteSpider(scrapy.Spider):
                 "Област": chitalishte.css('td.pad5:nth-child(5)::text').get().strip(),  
             }
         
+        yield from self.process_pagination(response)
+    def process_pagination(self, response):
         pagination_links = response.css('div.pagelist a::attr(href)').getall()
-        print(pagination_links)
         for link in pagination_links:
             if "sql_which" in link:
                 yield scrapy.Request(response.urljoin(link), callback=self.parse)
+        
