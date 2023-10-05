@@ -22,46 +22,69 @@ class InformacionniKartiSpider(scrapy.Spider):
                 yield scrapy.Request(response.urljoin(link), callback=self.parse_information_cards)
             yield from self.process_pagination(response)
     
+
     def parse_information_cards(self, response):
-        phones = response.css('input[name="form[phone]"]::attr(value)').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        formatted_phones = re.sub(r'[^0-9/,]', '', phones)
+        def format_broi(broi):
+            broi = broi.lower()
+            if not broi.isnumeric() and broi != "няма":
+                return ""
+            elif broi == "няма":
+                return 0
+            return float(broi)
+        
+        def format_texts(texts):
+            texts = texts.strip()
+            if "няма" in texts.lower() or "не" in texts.lower() or texts == "-" or texts == "0":
+                return ""
+            texts = re.sub(r'[\r\n;]', '|', texts)
+            texts = re.sub(r'[\t]',' ',texts)
+            texts = re.sub(r'\|+', '|', texts)
+            return texts
+       
+        h2_text = response.css('table h2::text').get()
+        h2_text_numbers = re.findall(r'\d+', h2_text)
+        info_karta_za = ''.join(h2_text_numbers)
 
-
+        phones = format_texts(response.css('input[name="form[phone]"]::attr(value)').get())
+        formatted_phones = str(re.sub(r'[^0-9/,\|]', '', phones))
+        
         email = response.css('input[name="form[email]"]::attr(value)').get()
         emails = re.split(r'\s|[,;]', email)
         emails = filter(lambda email: re.match(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', email), emails)
-        formatted_emails = ', '.join(emails)
+        formatted_emails = '|'.join(emails)
 
         bulstat = response.css('input[name="form[bulstat]"]::attr(value)').get()
         bulstats = re.split(r'(?<![\/,])\D+', bulstat)
         bulstats = filter(None, bulstats)
-        formatted_bulstats = ', '.join(bulstats)
+        formatted_bulstats = '|'.join(bulstats)
 
-        klubove_text = response.css('textarea[name="form[main][activities][clubs]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        ezici_text = response.css('textarea[name="form[main][activities][lang]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        kraj_text = response.css('textarea[name="form[main][activities][kraj]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        muzei_text = response.css('textarea[name="form[main][activities][museum]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
+        klubove_text = format_texts(response.css('textarea[name="form[main][activities][clubs]"]::text').get().strip())
+        ezici_text = format_texts(response.css('textarea[name="form[main][activities][lang]"]::text').get().strip())
+        kraj_text = format_texts(response.css('textarea[name="form[main][activities][kraj]"]::text').get().strip())
+        muzei_text = format_texts(response.css('textarea[name="form[main][activities][museum]"]::text').get().strip())
 
-        folk_text = response.css('textarea[name="form[main][ltvorch][folk]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        teatur_text = response.css('textarea[name="form[main][ltvorch][theatre]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        tancovi_grupi_text = response.css('textarea[name="form[main][ltvorch][dance]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        balet_text = response.css('textarea[name="form[main][ltvorch][balley]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        vocal_text = response.css('textarea[name="form[main][ltvorch][vocal]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        drugi_text = response.css('textarea[name="form[main][ltvorch][other]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
+        folk_text = format_texts(response.css('textarea[name="form[main][ltvorch][folk]"]::text').get().strip())
+        teatur_text = format_texts(response.css('textarea[name="form[main][ltvorch][theatre]"]::text').get().strip())
+        tancovi_grupi_text = format_texts(response.css('textarea[name="form[main][ltvorch][dance]"]::text').get().strip())
+        balet_text = format_texts(response.css('textarea[name="form[main][ltvorch][balley]"]::text').get().strip())
+        vocal_text = format_texts(response.css('textarea[name="form[main][ltvorch][vocal]"]::text').get().strip())
+        drugi_text = format_texts(response.css('textarea[name="form[main][ltvorch][other]"]::text').get().strip())
         
-        uchastiya_text = response.css('textarea[name="form[main][events]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        novi_dejnosti_text = response.css('textarea[name="form[main][newactivities][txt]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        rabota_s_drugi_text = response.css('textarea[name="form[main][injury]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        drugi_dejnosti_text =response.css('textarea[name="form[main][other]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
+        uchastiya_text = format_texts(response.css('textarea[name="form[main][events]"]::text').get().strip())
+        novi_dejnosti_text = format_texts(response.css('textarea[name="form[main][newactivities][txt]"]::text').get().strip())
+        rabota_s_drugi_text = format_texts(response.css('textarea[name="form[main][injury]"]::text').get().strip())
+        drugi_dejnosti_text =format_texts(response.css('textarea[name="form[main][other]"]::text').get().strip())
 
-        posledna_registraciya_text = response.css('input[name="form[org][prereg]"]::attr(value)').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        provedeni_subraniya_text = response.css('textarea[name="form[org][meetings]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        baza_text = response.css('textarea[name="form[org][matbase]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        obucheniya_text = response.css('textarea[name="form[org][obuchenie]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        sankcii_text = response.css('textarea[name="form[org][sanctions]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
-        dopulnitelno_text = response.css('textarea[name="form[remark]"]::text').get().strip().replace('\n', ', ').replace('\r', ', ').replace(';', ', ')
+        posledna_registraciya_text = format_texts(response.css('input[name="form[org][prereg]"]::attr(value)').get().strip())
+        provedeni_subraniya_text = format_texts(response.css('textarea[name="form[org][meetings]"]::text').get().strip())
+        baza_text = format_texts(response.css('textarea[name="form[org][matbase]"]::text').get().strip())
+        obucheniya_text = format_texts(response.css('textarea[name="form[org][obuchenie]"]::text').get().strip())
+        sankcii_text = format_texts(response.css('textarea[name="form[org][sanctions]"]::text').get().strip())
+        dopulnitelno_text = format_texts(response.css('textarea[name="form[remark]"]::text').get().strip())    
+        # дейности брой форматиране на инт, (няма, запетайки тн), дейности разделени, по добро форматиране с | или \n,
+        
         yield {
-            "ИНФОРМАЦИОННА КАРТА ЗА": response.css('input[name="form[year]"]::attr(value)').get().strip(),
+            "ИНФОРМАЦИОННА КАРТА ЗА": info_karta_za,
             "Рег. номер": response.css('input[name="form[regid]"]::attr(value)').get().strip(),
             "Наименование": response.css('input[name="form[name]"]::attr(value)').get().strip(),
             "Област": response.xpath('//label[contains(text(), "Област")]/following-sibling::input[@type="hidden"]/following-sibling::text()').get().strip(),
@@ -74,47 +97,47 @@ class InformacionniKartiSpider(scrapy.Spider):
             "Web страница": response.css('input[name="form[webpage]"]::attr(value)').get(),
             "Председател": response.css('input[name="form[director]"]::attr(value)').get(),
             "Секретар": response.css('input[name="form[secretary]"]::attr(value)').get(),
-            "Жители": response.css('input[name="form[teritory][person]"]::attr(value)').get(),
-            "Посетители": response.css('input[name="form[teritory][users]"]::attr(value)').get(),
-            "Клон 1": response.css('input[name="form[filial][1]"]::attr(value)').get(),
-            "Клон 2": response.css('input[name="form[filial][2]"]::attr(value)').get(),
-            "Брой членове": response.css('input[name="form[regusers]"]::attr(value)').get(),
-            "Молби за членство": response.css('input[name="form[regmolba]"]::attr(value)').get(),
-            "Нови членове": response.css('input[name="form[regnew]"]::attr(value)').get(),
-            "Отказани молби": response.css('input[name="form[regrej]"]::attr(value)').get(),
-            "Библиотечни дейности": response.css('input[name="form[main][biblioid]"]::attr(value)').get(),
-            "Участие 'Живи човешки съкровища'": response.css('textarea[name="form[main][treasures]"]::text').get(),
+            "Жители": format_broi(response.css('input[name="form[teritory][person]"]::attr(value)').get()),
+            "Посетители": format_broi(response.css('input[name="form[teritory][users]"]::attr(value)').get()),
+            "Клон 1": format_texts(response.css('input[name="form[filial][1]"]::attr(value)').get()),
+            "Клон 2": format_texts(response.css('input[name="form[filial][2]"]::attr(value)').get()),
+            "Брой членове": format_broi(response.css('input[name="form[regusers]"]::attr(value)').get()),
+            "Молби за членство": format_broi(response.css('input[name="form[regmolba]"]::attr(value)').get()),
+            "Нови членове": format_broi(response.css('input[name="form[regnew]"]::attr(value)').get()),
+            "Отказани молби": format_broi(response.css('input[name="form[regrej]"]::attr(value)').get()),
+            "Библиотечни дейности": format_texts(response.css('input[name="form[main][biblioid]"]::attr(value)').get()),
+            "Участие 'Живи човешки съкровища'": format_texts(response.css('textarea[name="form[main][treasures]"]::text').get()),
             "Регионални листа": response.css('input[name="form[main][treasure][regnum]"]::attr(value)').get(),
             "Национални листа": response.css('input[name="form[main][treasure][nacnum]"]::attr(value)').get(),
             "Кръжоци, клубове": klubove_text,
-            "Kръжоци, клубове бр.": response.css('input[name="form[main][activities][clubsnum]"]::attr(value)').get(),
+            "Kръжоци, клубове бр.": format_broi(response.css('input[name="form[main][activities][clubsnum]"]::attr(value)').get()),
             "Езикови школи, кръжоци": ezici_text,
-            "Езикови, кръжоци бр.": response.css('input[name="form[main][activities][langnum]"]::attr(value)').get(),
+            "Езикови, кръжоци бр.": format_broi(response.css('input[name="form[main][activities][langnum]"]::attr(value)').get()),
             "Краезнание": kraj_text,
-            "Краезнание бр.": response.css('input[name="form[main][activities][krajnum]"]::attr(value)').get(),
+            "Краезнание бр.": format_broi(response.css('input[name="form[main][activities][krajnum]"]::attr(value)').get()),
             "Музейни колекции": muzei_text,
-            "Музейни колекции бр.": response.css('input[name="form[main][activities][museumnum]"]::attr(value)').get(),
+            "Музейни колекции бр.": format_broi(response.css('input[name="form[main][activities][museumnum]"]::attr(value)').get()),
             "Фолклорни състави и формации": folk_text,
-            "Фолклорни състави и формации бр.": response.css('input[name="form[main][ltvorch][folknum]"]::attr(value)').get().strip(),
+            "Фолклорни състави и формации бр.": format_broi(response.css('input[name="form[main][ltvorch][folknum]"]::attr(value)').get().strip()),
             "Театрални състави": teatur_text,
-            "Театрални състави бр.": response.css('input[name="form[main][ltvorch][theatrenum]"]::attr(value)').get().strip(),
+            "Театрални състави бр.": format_broi(response.css('input[name="form[main][ltvorch][theatrenum]"]::attr(value)').get().strip()),
             "Танцови състави и групи": tancovi_grupi_text,
-            "Танцови състави и групи бр.": response.css('input[name="form[main][ltvorch][dancenum]"]::attr(value)').get().strip(),
+            "Танцови състави и групи бр.": format_broi(response.css('input[name="form[main][ltvorch][dancenum]"]::attr(value)').get().strip()),
             "Групи за класически и/или модерен балет": balet_text,
-            "Групи за класически и/или модерен балет бр.": response.css('input[name="form[main][ltvorch][balleynum]"]::attr(value)').get().strip(),
+            "Групи за класически и/или модерен балет бр.": format_broi(response.css('input[name="form[main][ltvorch][balleynum]"]::attr(value)').get().strip()),
             "Вокални групи, хорове и индивидуални изпълнители": vocal_text,
-            "Вокални групи, хорове и индивидуални изпълнители бр.": response.css('input[name="form[main][ltvorch][vocalnum]"]::attr(value)').get().strip(),
+            "Вокални групи, хорове и индивидуални изпълнители бр.": format_broi(response.css('input[name="form[main][ltvorch][vocalnum]"]::attr(value)').get().strip()),
             "Други": drugi_text,
-            "Други бр.": response.css('input[name="form[main][ltvorch][othernum]"]::attr(value)').get().strip(),
+            "Други бр.": format_broi(response.css('input[name="form[main][ltvorch][othernum]"]::attr(value)').get().strip()),
             "Участия празници, фестивали т.н.": uchastiya_text,
-            "Участия празници, фестивали т.н. бр.": response.css('input[name="form[main][eventsnum]"]::attr(value)').get().strip(),
+            "Участия празници, фестивали т.н. бр.": format_broi(response.css('input[name="form[main][eventsnum]"]::attr(value)').get().strip()),
             "Нови дейности": novi_dejnosti_text,
-            "Нови дейности самостоятелно бр.": response.css('input[name="form[main][newactivities][mainsum]"]::attr(value)').get().strip(),
-            "Нови дейности несамостоятелно бр.": response.css('input[name="form[main][newactivities][partnersum]"]::attr(value)').get().strip(),
+            "Нови дейности самостоятелно бр.": format_broi(response.css('input[name="form[main][newactivities][mainsum]"]::attr(value)').get().strip()),
+            "Нови дейности несамостоятелно бр.": format_broi(response.css('input[name="form[main][newactivities][partnersum]"]::attr(value)').get().strip()),
             "Работа с хора с увреждания, етнически различия и др.": rabota_s_drugi_text,
-            "Работа с хора с увреждания, етнически различия и др.  бр.": response.css('input[name="form[main][othersum]"]::attr(value)').get().strip(),
+            "Работа с хора с увреждания, етнически различия и др.  бр.": format_broi(response.css('input[name="form[main][othersum]"]::attr(value)').get().strip()),
             "Други дейности": drugi_dejnosti_text,
-            "Други дейности бр.": response.css('input[name="form[main][ltvorch][vocalnum]"]::attr(value)').get().strip(),
+            "Други дейности бр.": format_broi(response.css('input[name="form[main][ltvorch][vocalnum]"]::attr(value)').get().strip()),
             "Проведени събрания": provedeni_subraniya_text,
             "Последна регистрация": posledna_registraciya_text,
             "Материална база": baza_text,
