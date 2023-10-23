@@ -2,7 +2,8 @@ from pathlib import Path
 
 import scrapy
 import re
-
+import csv
+    
 class InformacionniKartiSpider(scrapy.Spider):
 
     name = "informacionni_karti"
@@ -10,6 +11,16 @@ class InformacionniKartiSpider(scrapy.Spider):
         "https://chitalishta.com/index.php?&act=community&do=list&special=1&&sql_which=0"
     ]
     
+    def save_to_csv(self, data):
+        csv_file = 'informacionni_karti_quoted.csv'
+        with open(csv_file, 'a', newline='', encoding='utf-8') as csvfile:
+            csv_writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
+            if csvfile.tell() == 0:
+                header = list(data.keys())
+                csv_writer.writerow(header)
+            csv_writer.writerow(data.values())
+
+
     def parse(self, response):
         for chitalishte in response.css("tr.odd"):
             chitalishte_detail_link = chitalishte.css('td.pad5 a[href*="do=detail"]::attr(href)').get()
@@ -32,21 +43,22 @@ class InformacionniKartiSpider(scrapy.Spider):
                 return 0
             return float(broi)
         
-        def format_texts(texts):
-            texts = texts.strip()
-            if "няма" in texts.lower() or "не" in texts.lower() or texts == "-" or texts == "0":
+        def format_texts(text):
+            text = text.strip()
+            text_lower = text.lower()
+            if "няма" in text_lower or "не" in text_lower or text == "-" or text == "0":
                 return ""
-            texts = re.sub(r'[\r\n;]', '|', texts)
-            texts = re.sub(r'[\t]',' ',texts)
-            texts = re.sub(r'\|+', '|', texts)
-            return texts
+            text = re.sub(r'[\r\n;]', '|', text)
+            text = re.sub(r'[\t]',' ',text)
+            text = re.sub(r'\|+', '|', text)
+            return text
        
         h2_text = response.css('table h2::text').get()
         h2_text_numbers = re.findall(r'\d+', h2_text)
         info_karta_za = ''.join(h2_text_numbers)
 
-        phones = format_texts(response.css('input[name="form[phone]"]::attr(value)').get())
-        formatted_phones = str(re.sub(r'[^0-9/,\|]', '', phones))
+        phones = format_texts(response.css('input[name="form[phone]"]::attr(value)').get()).replace(',','|')
+        formatted_phones = str(re.sub(r'[^0-9/,\|]', '', phones)).replace(',', '|')
         
         email = response.css('input[name="form[email]"]::attr(value)').get()
         emails = re.split(r'\s|[,;]', email)
@@ -81,9 +93,8 @@ class InformacionniKartiSpider(scrapy.Spider):
         obucheniya_text = format_texts(response.css('textarea[name="form[org][obuchenie]"]::text').get().strip())
         sankcii_text = format_texts(response.css('textarea[name="form[org][sanctions]"]::text').get().strip())
         dopulnitelno_text = format_texts(response.css('textarea[name="form[remark]"]::text').get().strip())    
-        # дейности брой форматиране на инт, (няма, запетайки тн), дейности разделени, по добро форматиране с | или \n,
         
-        yield {
+        data = {
             "ИНФОРМАЦИОННА КАРТА ЗА": info_karta_za,
             "Рег. номер": response.css('input[name="form[regid]"]::attr(value)').get().strip(),
             "Наименование": response.css('input[name="form[name]"]::attr(value)').get().strip(),
@@ -151,6 +162,7 @@ class InformacionniKartiSpider(scrapy.Spider):
             "Санкции": sankcii_text,
             "Допълнително": dopulnitelno_text
         }
+        self.save_to_csv(data)
         yield from self.process_pagination(response)
 
     def process_pagination(self, response):
